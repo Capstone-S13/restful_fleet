@@ -31,6 +31,7 @@ class ServerNode(Node):
                 reliability=Reliability.RELIABLE,
                 durability=Durability.TRANSIENT_LOCAL)
         self.server = server
+        self.server.logger = self.get_logger()
         self.timer = self.create_timer(config.timer_period, self.timer_callback)
         self.robots = {}
 
@@ -82,19 +83,24 @@ class ServerNode(Node):
         json_msg["robot_name"] = _msg.robot_name
         json_msg["destination"] = self.transform_fleet_to_rmf(_msg.destination)
         self.server.send_destination_request(json_msg)
+        self.get_logger().info("sending path request")
 
     def handle_path_request(self, _msg):
+        self.get_logger().info(f"receive fleet state of fleet: {_msg.fleet_name}")
+        if _msg.fleet_name != self.config.fleet_name:
+            return
         json_msg = {}
         json_msg["fleet_name"] = _msg.fleet_name
         json_msg["robot_name"] = _msg.robot_name
         json_msg["path"] = []
-        for location in _msg.path:
+        for i in range(len(_msg.path)):
+            location = _msg.path[i]
             loc_json = self.convert_location_to_json(location)
             location = self.transform_fleet_to_rmf(location)
             json_msg["path"].append(loc_json)
-
         json_msg["task_id"] = _msg.task_id
         self.server.send_path_request(json_msg)
+        self.get_logger().info("sending path request")
 
     def handle_mode_request(self, _msg):
         return
@@ -103,6 +109,7 @@ class ServerNode(Node):
         json_msg = {}
         json_msg["data"] = _msg.data
         self.server.send_perform_action_request(json_msg)
+        self.get_logger().info(f"sending perform action request: {_msg}")
         return
 
     def convert_location_to_json(self, location):
@@ -138,6 +145,7 @@ class ServerNode(Node):
         return robot_mode
 
     def convert_robot_mode_to_json(self, robot_mode):
+        # TODO: find a better way to do this
         robot_mode_json = {}
         if robot_mode.mode == RobotMode.MODE_IDLE:
             robot_mode_json["mode"] = 0
@@ -161,8 +169,8 @@ class ServerNode(Node):
         fleet_state.name = self.config.fleet_name
         for robot in self.robots:
             fleet_state.robots.append(self.robots[robot])
-
         self.fleet_state_pub.publish(fleet_state)
+        self.get_logger().info("Publishing fleet_states")
 
     def publish_end_action(self, robot):
         mode_request = ModeRequest()

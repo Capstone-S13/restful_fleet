@@ -1,6 +1,7 @@
-from setuptools import setup
-from glob import glob
 import os
+from glob import glob
+from setuptools import setup
+
 
 package_name = 'restful_fleet_server'
 
@@ -23,6 +24,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'restful_fleet_server=restful_fleet_server.app:main'
         ],
     },
 )

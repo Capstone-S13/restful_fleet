@@ -1,6 +1,9 @@
 class ServerConfig():
-    def __inti__(self):
+    def __init__(self):
         self.client_ip = "0.0.0.0"
         self.client_port = 9000
         self.robot_state_route = "/robot-state"
+        self.mode_request_route = "/mode-request"
+        self.path_request_route = "/path-request"
         self.end_action_route = "/end-action"
+        self.perform_action_request_route = "/perform-action"
