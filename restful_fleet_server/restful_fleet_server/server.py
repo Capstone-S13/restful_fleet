@@ -27,6 +27,7 @@ class Server():
         url = self.get_url(self.config.mode_request_route)
         try:
             resp = requests.post(url, json=json_msg)
+            self.logger.info(f"mode request send status: {resp.status_code}")
         except:
             self.logger.info("client not up")
 
@@ -34,6 +35,7 @@ class Server():
         url = self.get_url(self.config.path_request_route)
         try:
             resp = requests.post(url, json=json_msg)
+            self.logger.info(f"path request send status: {resp.status_code}")
         except:
             self.logger.info("client not up")
 
@@ -42,6 +44,7 @@ class Server():
         url = self.get_url(self.config.perform_action_request_route)
         try:
             resp = requests.post(url, json=json_msg)
+            self.logger.info(f"perform_action request send status: {resp.status_code}")
         except:
             self.logger.info("client not up")
 
@@ -50,6 +53,7 @@ class Server():
         url = self.get_url(self.config.destination_request_route)
         try:
             resp = requests.post(url, json=json_msg)
+            self.logger.info(f"destination request send status: {resp.status_code}")
         except:
             self.logger.info("client not up")
 

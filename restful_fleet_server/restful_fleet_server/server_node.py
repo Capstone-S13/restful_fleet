@@ -132,12 +132,12 @@ class ServerNode(Node):
         location.x = location_json["x"]
         location.y = location_json["y"]
         location.yaw = location_json["yaw"]
-        location.obey_approach_speed_limit = \
-            location_json["obey_approach_speed_limit"]
-        location.approach_speed_limit = \
-            location_json["approach_speed_limit"]
+        # location.obey_approach_speed_limit = \
+        #     location_json["obey_approach_speed_limit"]
+        # location.approach_speed_limit = \
+        #     location_json["approach_speed_limit"]
         location.level_name = location_json["level_name"]
-        location.index = location_json["index"]
+        # location.index = location_json["index"]
         return location
 
     def convert_json_to_robot_mode(self, robot_mode_json) -> RobotMode:
@@ -181,15 +181,16 @@ class ServerNode(Node):
         self.end_action_pub.publish(mode_request)
 
     def update_robot_state(self, json_msg):
+        if json_msg["name"] not in self.robots:
+            self.get_logger().info(f"registered new robot {json_msg['name']}")
         robot_state = RobotState()
         robot_state.name = json_msg["name"]
         robot_state.model = json_msg["model"]
         robot_state.task_id = json_msg["task_id"]
-        robot_state.seq = int(json_msg["seq"])
+        robot_state.battery_percent = float(json_msg["battery_percent"])
         # convert robot mode
         robot_mode = self.convert_json_to_robot_mode(json_msg["robot_mode"])
-        robot_state.mode = robot_mode
-
+        robot_state.mode.mode = RobotMode.MODE_PAUSED
         robot_state.location = \
             self.convert_json_to_location(json_msg["location"])
         for location_json in json_msg["path"]:

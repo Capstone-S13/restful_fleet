@@ -46,6 +46,7 @@ class ClientNode():
         self.emergency = False
         self.paused = False
         self.request_error= False
+        self.current_task_id = ""
 
     def init(self):
         # in case we need to set up some stuff
@@ -69,14 +70,14 @@ class ClientNode():
 
     def get_robot_transform(self) -> bool:
         try:
-            tmp_transform = TransformStamped()
-            self.tf2_buffer.lookup_transform(\
+            tmp_transform = self.tf2_buffer.lookup_transform(\
                 self.config.map_frame,
                 self.config.robot_frame,
-                rospy.Time(0,0))
+                rospy.Time(0))
 
             self.previous_robot_transform = self.current_robot_transform
             self.current_robot_transform = tmp_transform
+            rospy.loginfo("updating robot transform")
 
         except:
             rospy.logwarn(f"error getting transform")
@@ -154,10 +155,12 @@ class ClientNode():
 
     def send_robot_state(self):
         robot_state_json = {}
+        robot_state_json["fleet_name"] = self.config.fleet_name
         robot_state_json["name"] = self.config.robot_name
         robot_state_json["model"] = self.config.robot_model
         robot_state_json["task_id"] = self.current_task_id
-        robot_state_json["battery_percent"] = 100*self.current_battery_state
+        robot_state_json["battery_percent"] = 100*self.current_battery_state.percentage
+        robot_state_json["robot_mode"] = 0
         robot_state_json["location"] = self.transform_to_location_json(self.current_robot_transform)
         path = []
         for i in range(len(self.goal_path)):
@@ -199,15 +202,20 @@ class ClientNode():
         time_stamp_json = {}
         time_stamp_json["sec"] = transform.header.stamp.secs
         time_stamp_json["nanosec"] = transform.header.stamp.nsecs
+        location_json["t"] = time_stamp_json
         location_json["x"] = transform.transform.translation.x
         location_json["y"] = transform.transform.translation.y
+        quat = [transform.transform.rotation.x,transform.transform.rotation.y\
+            ,transform.transform.rotation.z, transform.transform.rotation.w]
         location_json["yaw"] =\
-            transformations.euler_from_quaternion(transform.transform.rotation)[2]
+            transformations.euler_from_quaternion(quat)[2]
         location_json["level_name"] = self.config.level_name
         return location_json
 
 
     def loop(self):
+        self.get_robot_transform()
+        self.send_robot_state()
         if (len(self.goal_path) != 0):
             if (not self.goal_path[0].sent):
                 rospy.loginfo("Sending new goal!")

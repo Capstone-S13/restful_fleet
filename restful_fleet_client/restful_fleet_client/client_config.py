@@ -1,7 +1,7 @@
 class ClientConfig():
     def __init__(self):
         self.server_ip = "0.0.0.0"
-        self.server_port = 9001
+        self.server_port = 9000
         # receiving
         self.mode_request_route = "/battery_state"
         self.path_request_route = "/path-request"

@@ -24,13 +24,15 @@ class Client():
         url = self.get_url(self.config.battery_state_route)
         try:
             resp = requests.post(url, json=json_msg)
+            rospy.loginfo(f"battery state send status {resp.status_code}")
         except:
             rospy.loginfo("server not up")
 
     def send_robot_state(self, json_msg):
-        url = self.get_url(self.config.battery_state_route)
+        url = self.get_url(self.config.robot_state_route)
         try:
             resp = requests.post(url, json=json_msg)
+            rospy.loginfo(f"robot state send status {resp.status_code}")
         except:
             rospy.loginfo("server not up")
 
@@ -38,6 +40,7 @@ class Client():
         url = self.get_url(self.config.end_action_route)
         try:
             resp = requests.post(url, json=json_msg)
+            rospy.loginfo(f"end action send status {resp.status_code}")
         except:
             rospy.loginfo("server not up")
 

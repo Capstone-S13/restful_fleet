@@ -1,8 +1,8 @@
 
 class ClientNodeConfig():
     def __init__(self):
-        self.fleet_name = "fleet_name"
-        self.robot_name = "robot_name"
+        self.fleet_name = "Unodopo"
+        self.robot_name = "Unodopo1"
         self.robot_model = "robot_model"
         self.level_name = "level_name"
         self.battery_topic = "/battery_state"

@@ -40,15 +40,20 @@ socketio.init_app(app, cors_allowed_origins="*")
 def handle_robot_state():
     # save robot state into a dictionary
     robot_state_json = request.json
+    server_node.get_logger().info(f"robot state: {robot_state_json}")
     if (robot_state_json["fleet_name"] != server_node_config.fleet_name):
-        return
+        response = app.response_class(status=404)
+        return response
     server_node.update_robot_state(robot_state_json)
+    response = app.response_class(status=200)
+    return response
 
 @app.route(server_config.end_action_route, methods=['POST'])
 def end_perform_action():
     #
     robot = request.json["robot"]
     server_node.publish_end_action(robot)
+    response = app.response_class(status=200)
 
 def restful_server_spin():
     rclpy.spin(server_node)
