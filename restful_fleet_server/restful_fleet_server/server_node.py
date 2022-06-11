@@ -189,8 +189,7 @@ class ServerNode(Node):
         robot_state.task_id = json_msg["task_id"]
         robot_state.battery_percent = float(json_msg["battery_percent"])
         # convert robot mode
-        robot_mode = self.convert_json_to_robot_mode(json_msg["robot_mode"])
-        robot_state.mode.mode = RobotMode.MODE_PAUSED
+        robot_state.mode.mode = json_msg["robot_mode"]
         robot_state.location = \
             self.convert_json_to_location(json_msg["location"])
         for location_json in json_msg["path"]:
