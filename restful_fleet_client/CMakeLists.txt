@@ -31,6 +31,8 @@ catkin_package(
 #  DEPENDS system_lib
 )
 
+catkin_python_setup()
+
 ###########
 ## Build ##
 ###########
@@ -51,15 +53,9 @@ install(
     DESTINATION share/${PROJECT_NAME}
 )
 
+
 catkin_install_python(PROGRAMS
-    restful_fleet_client/app.py
-    restful_fleet_client/client_node.py
-    restful_fleet_client/client_node_config.py
-    restful_fleet_client/client.py
-    restful_fleet_client/client_config.py
-    restful_fleet_client/utilities.py
-    # so we can do relative imports
-    restful_fleet_client/__init__.py
+    scripts/app.py
     DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
