@@ -27,7 +27,7 @@ from  restful_fleet_client.utilities import is_transform_close, RobotMode
 class Goal():
     def __init__(self):
         self.level_name = ""
-        self.move_base_goal = None
+        self.goal = None
         self.sent = False
         self.aborted_count = 0
         self.goal_end_time = None
@@ -69,6 +69,7 @@ class ClientNode():
         if (self.current_task_id == request_task_id\
             or self.config.robot_name != request_robot_name\
             or self.config.fleet_name != request_fleet_name):
+            rospy.loginfo("not a valid request")
             return False
         return True
 
@@ -81,7 +82,7 @@ class ClientNode():
 
             self.previous_robot_transform = self.current_robot_transform
             self.current_robot_transform = tmp_transform
-            rospy.loginfo("updating robot transform")
+            # rospy.loginfo("updating robot transform")
 
         except:
             rospy.logwarn(f"error getting transform")
@@ -107,7 +108,7 @@ class ClientNode():
             return RobotMode.MODE_PAUSED.value
 
         # otherwise robot mode is idle
-        return RobotMode.MODE_IDLE
+        return RobotMode.MODE_IDLE.value
 
     def receive_path_request(self, path_req_json) -> bool:
         rospy.loginfo("received path request")
@@ -130,15 +131,15 @@ class ClientNode():
                 self.paused = False
                 return False
             # add path to goal_path
-            for i in len(path_req_json["path"]):
+            for i in range(len(path_req_json["path"])):
                 goal = Goal()
                 goal_json = path_req_json["path"][i]
                 goal.level_name = goal_json["level_name"]
-                goal.move_base_goal =\
+                goal.goal =\
                     self.location_to_move_base_goal(goal_json)
                 goal.sent = False
-                goal.goal_end_time = rospy.Time(goal_json["t"]["sec"],\
-                    goal_json["t"]["nsec"])
+                goal.goal_end_time = rospy.Time(int(goal_json["t"]["sec"]),\
+                    int(goal_json["t"]["nanosec"]))
                 self.goal_path.append(goal)
             self.current_task_id = path_req_json["task_id"]
 
@@ -172,16 +173,21 @@ class ClientNode():
             location_json={}
             time_stamp_json = {}
             time_stamp_json["sec"] =\
-                self.goal_path[i].goal.target_pose.header.stamp.secs
+                int(self.goal_path[i].goal.target_pose.header.stamp.secs)
             time_stamp_json["nanosec"] =\
-                self.goal_path[i].goal.target_pose.header.stamp.nsecs
+                int(self.goal_path[i].goal.target_pose.header.stamp.nsecs)
             location_json["t"] = time_stamp_json
             location_json["x"] =\
-                self.goal_path[i].goal.target_pose.pose.position.x
+                float(self.goal_path[i].goal.target_pose.pose.position.x)
             location_json["y"] =\
-                self.goal_path[i].goal.target_pose.pose.position.y
-            location_json["yaw"] = transformations.euler_from_quaternion(\
-                self.goal_path[i].goal.target_pose.pose.orientation)
+                float(self.goal_path[i].goal.target_pose.pose.position.y)
+            quaternion = [0.0, 0.0, 0.0, 0.0]
+            quaternion[0] = self.goal_path[i].goal.target_pose.pose.orientation.x
+            quaternion[1] = self.goal_path[i].goal.target_pose.pose.orientation.y
+            quaternion[2] = self.goal_path[i].goal.target_pose.pose.orientation.z
+            quaternion[3] = self.goal_path[i].goal.target_pose.pose.orientation.w
+            location_json["yaw"] = float(transformations.euler_from_quaternion(\
+                quaternion)[2])
             location_json["level_name"] = self.config.level_name
             path.append(location_json)
         robot_state_json["path"] = path
@@ -191,15 +197,23 @@ class ClientNode():
 
     def location_to_move_base_goal(self, location_json) -> MoveBaseGoal:
         goal = MoveBaseGoal()
-        goal.target_pose.header.frame_id = config.map_frame
+        goal.target_pose.header.frame_id = self.config.map_frame
         goal.target_pose.header.stamp.secs = location_json["t"]["sec"]
         goal.target_pose.header.stamp.nsecs = location_json["t"]["nanosec"]
         goal.target_pose.pose.position.x = location_json["x"]
         goal.target_pose.pose.position.y = location_json["y"]
         goal.target_pose.pose.position.z = 0.0
         # quarternion
-        goal.target_pose.pose.orientation = \
-            transformations.quaternion_from_euler(0.0, 0.0, location_json["yaw"])
+        quaternion =transformations.quaternion_from_euler(\
+            0.0, 0.0, float(location_json["yaw"]))
+        goal.target_pose.pose.orientation.x = quaternion[0]
+        goal.target_pose.pose.orientation.y = quaternion[1]
+        goal.target_pose.pose.orientation.z = quaternion[2]
+        goal.target_pose.pose.orientation.w = quaternion[3]
+
+
+
+
         return goal
 
     def transform_to_location_json(self,transform):
@@ -225,16 +239,17 @@ class ClientNode():
             if (not self.goal_path[0].sent):
                 rospy.loginfo("Sending new goal!")
                 try:
-                    self.move_base_client.sendGoal(self.goals[0].goal)
+                    self.move_base_client.send_goal(self.goal_path[0].goal)
                     self.goal_path[0].sent = True
                     return
-                except:
+                except Exception as e:
                     rospy.loginfo("failed to send goal")
+                    rospy.loginfo(f"{e}")
             current_goal_state = self.move_base_client.get_state()
             if current_goal_state == GoalStatus.SUCCEEDED:
                 rospy.loginfo("current goals state: SUCCEEDED")
                 if rospy.Time.now() >= self.goal_path[0].goal_end_time:
-                    self.goal_path.remove(0)
+                    self.goal_path.pop(0)
                 else:
                     wait_time_remaining = self.goal_path[0].goal_end_time - rospy.Time.now()
                     rospy.loginfo(f"we reached our goalearly! Waiting for \

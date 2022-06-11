@@ -73,7 +73,7 @@ class ServerNode(Node):
         return
 
     # this takes in type rmf_fleet_msgs.msg.Location
-    def transform_fleet_to_rmf(self, rmf_frame_location) -> Location:
+    def transform_fleet_to_rmf(self, rmf_frame_location):
         fleet_frame_location = Location()
         return fleet_frame_location
 
@@ -86,7 +86,7 @@ class ServerNode(Node):
         self.get_logger().info("sending path request")
 
     def handle_path_request(self, _msg):
-        self.get_logger().info(f"receive fleet state of fleet: {_msg.fleet_name}")
+        self.get_logger().info(f"receive path request of fleet: {_msg.fleet_name}")
         if _msg.fleet_name != self.config.fleet_name:
             return
         json_msg = {}
@@ -95,8 +95,8 @@ class ServerNode(Node):
         json_msg["path"] = []
         for i in range(len(_msg.path)):
             location = _msg.path[i]
+            # location = self.transform_fleet_to_rmf(location)
             loc_json = self.convert_location_to_json(location)
-            location = self.transform_fleet_to_rmf(location)
             json_msg["path"].append(loc_json)
         json_msg["task_id"] = _msg.task_id
         self.server.send_path_request(json_msg)
@@ -129,9 +129,9 @@ class ServerNode(Node):
         location = Location()
         location.t.sec = int(location_json["t"]["sec"])
         location.t.nanosec = int(location_json["t"]["nanosec"])
-        location.x = location_json["x"]
-        location.y = location_json["y"]
-        location.yaw = location_json["yaw"]
+        location.x = float(location_json["x"])
+        location.y = float(location_json["y"])
+        location.yaw = float(location_json["yaw"])
         # location.obey_approach_speed_limit = \
         #     location_json["obey_approach_speed_limit"]
         # location.approach_speed_limit = \

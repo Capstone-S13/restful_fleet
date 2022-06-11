@@ -33,7 +33,7 @@ class Client():
         url = self.get_url(self.config.robot_state_route)
         try:
             resp = requests.post(url, json=json_msg)
-            rospy.loginfo(f"robot state send status {resp.status_code}")
+            # rospy.loginfo(f"robot state send status {resp.status_code}")
         except:
             rospy.loginfo("server not up")
 

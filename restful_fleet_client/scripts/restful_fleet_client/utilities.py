@@ -22,10 +22,12 @@ def is_transform_close(first=TransformStamped, second=TransformStamped()):
     if (first.header.frame_id !=second.header.frame_id\
         or first.child_frame_id != second.child_frame_id):
         return False
-    elapsed_sec = second.header.stamp - first.header.stamp.to_sec()
+    elapsed_sec = second.header.stamp.to_sec() - first.header.stamp.to_sec()
     first_pos = first.transform.translation
     second_pos = second.transform.translation
     distance = math.sqrt((first_pos.x-second_pos.x)**2 +\
         (first_pos.y-second_pos.y)**2)
+    if elapsed_sec == 0:
+        return 0
     distance = abs(distance/elapsed_sec)
     return distance

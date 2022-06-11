@@ -27,7 +27,7 @@ class Server():
         url = self.get_url(self.config.mode_request_route)
         try:
             resp = requests.post(url, json=json_msg)
-            self.logger.info(f"mode request send status: {resp.status_code}")
+            # self.logger.info(f"mode request send status: {resp.status_code}")
         except:
             self.logger.info("client not up")
 
