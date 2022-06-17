@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 
 from distutils.command.config import config
+from pickle import TRUE
 import rospy
 from http import HTTPStatus
 from threading import Thread
@@ -20,10 +21,9 @@ from restful_fleet_client.client_config import ClientConfig
 from restful_fleet_client.client_node import ClientNode
 from restful_fleet_client.client_node_config import ClientNodeConfig
 
-
 # in order to create the nodes
 rospy.init_node('restful_client_server', anonymous=True)
-rate = rospy.Rate(3)
+rate = rospy.Rate(0.5)
 
 _client_config = ClientConfig()
 _client_node_config = ClientNodeConfig()
@@ -72,11 +72,15 @@ def handle_perform_action():
 
 def restful_client_spin():
     rospy.spin()
+    rospy.loginfo("exiting from spin thread")
+    return
 
 def loop_spin():
     while not rospy.is_shutdown():
         _client_node.loop()
         rate.sleep()
+    rospy.loginfo("exiting from loop thread")
+    return
 
 def main():
     client_ip = "0.0.0.0"
@@ -93,9 +97,10 @@ def main():
 
     print(f"set Restful client port to:{client_ip}:{port_num}")
     app.run(host=client_ip, port=port_num, debug=True, use_reloader=False)
-    loop_thread.join()
-    spin_thread.join()
-    rospy.signal_shutdown("shutdown")
+    rospy.loginfo("flask app ended")
+    # loop_thread.join()
+    # spin_thread.join()
+    rospy.loginfo("joined threads")
 
 if __name__ =='__main__':
     main()
