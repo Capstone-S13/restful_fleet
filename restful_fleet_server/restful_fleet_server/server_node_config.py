@@ -3,7 +3,7 @@ class ServerNodeConfig():
     def __init__(self):
         self.node_name = "restful_fleet_server"
         self.fleet_name = "Unodopo"
-        self.timer_period = 10
+        self.timer_period = 0.5
         self.fleet_state_pub_rate = 10
         self.sub_rate = 10
 

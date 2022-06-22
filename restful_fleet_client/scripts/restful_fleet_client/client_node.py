@@ -1,8 +1,5 @@
-from asyncio import FastChildWatcher
-from distutils.command.config import config
-from flask import Config
 from numpy import math
-
+from threading import Semaphore
 from requests import request
 from rx import catch
 import rospy
@@ -51,6 +48,8 @@ class ClientNode():
         self.paused = False
         self.request_error= False
         self.current_task_id = ""
+        self.task_validity_semaphore = Semaphore()
+
 
     def init(self):
         # in case we need to set up some stuff
@@ -66,11 +65,15 @@ class ClientNode():
 
     def is_valid_request(self, request_fleet_name, request_robot_name,\
         request_task_id) -> bool:
+        self.task_validity_semaphore.acquire()
         if (self.current_task_id == request_task_id\
             or self.config.robot_name != request_robot_name\
             or self.config.fleet_name != request_fleet_name):
             rospy.loginfo("not a valid request")
+            self.task_validity_semaphore.release()
             return False
+        self.current_task_id = request_task_id
+        self.task_validity_semaphore.release()
         return True
 
     def get_robot_transform(self) -> bool:
@@ -141,6 +144,8 @@ class ClientNode():
                 goal.goal_end_time = rospy.Time(int(goal_json["t"]["sec"]),\
                     int(goal_json["t"]["nanosec"]))
                 self.goal_path.append(goal)
+            # we wanna move the setting of the task id to be
+            # part of the critical section in the is valid request section
             self.current_task_id = path_req_json["task_id"]
 
             if self.paused:
@@ -190,6 +195,7 @@ class ClientNode():
                 quaternion)[2])
             location_json["level_name"] = self.config.level_name
             path.append(location_json)
+        rospy.loginfo(f"the goal path length is {len(self.goal_path)}")
         robot_state_json["path"] = path
         self.client.send_robot_state(robot_state_json)
 
@@ -210,9 +216,6 @@ class ClientNode():
         goal.target_pose.pose.orientation.y = quaternion[1]
         goal.target_pose.pose.orientation.z = quaternion[2]
         goal.target_pose.pose.orientation.w = quaternion[3]
-
-
-
 
         return goal
 
@@ -235,6 +238,7 @@ class ClientNode():
     def loop(self):
         self.get_robot_transform()
         self.send_robot_state()
+        # execute path request if any
         if (len(self.goal_path) != 0):
             if (not self.goal_path[0].sent):
                 rospy.loginfo("Sending new goal!")
@@ -252,15 +256,16 @@ class ClientNode():
                     self.goal_path.pop(0)
                 else:
                     wait_time_remaining = self.goal_path[0].goal_end_time - rospy.Time.now()
-                    rospy.loginfo(f"we reached our goalearly! Waiting for \
+                    rospy.loginfo(f"we reached our goal early! Waiting for \
                         {wait_time_remaining.to_sec()} more seconds")
+                    self.goal_path.pop(0)
                 return
             elif current_goal_state == GoalStatus.ACTIVE:
                 return
             elif current_goal_state == GoalStatus.ABORTED:
-                self.goal_path[0].aborted_cout += 1
+                self.goal_path[0].aborted_count += 1
 
-                if (self.goal_path[0].aborted_cout < self.max_tries):
+                if (self.goal_path[0].aborted_count < self.max_tries):
                     rospy.loginfo(f"robot's naviation stack has been aborted the \
                         current goal {self.goal_path[0].aborted_count} times. Check if there is \
                             nothing in the way of the robot. Trying again .....")

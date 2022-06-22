@@ -1,7 +1,5 @@
 #! /usr/bin/env python3
 
-from distutils.command.config import config
-from pickle import TRUE
 import rospy
 from http import HTTPStatus
 from threading import Thread
@@ -41,9 +39,12 @@ socketio.init_app(app, cors_allowed_origins="*")
 @app.route(_client_config.path_request_route, methods=['POST'])
 def handle_path_request():
     path_request_json = request.json
-    rospy.loginfo(f"received path request: {path_request_json}")
-    _client_node.receive_path_request(path_request_json)
-    response = app.response_class(status=200)
+    rospy.loginfo(f"received path request of id: {path_request_json['task_id']}\
+        , of length {len(path_request_json['path'])}")
+    response = app.response_class(status=HTTPStatus.NOT_ACCEPTABLE.value)
+    if _client_node.receive_path_request(path_request_json):
+        rospy.loginfo("request is valid")
+        response = app.response_class(status=200)
     return response
 
 @app.route(_client_config.mode_request_route, methods=['POST'])

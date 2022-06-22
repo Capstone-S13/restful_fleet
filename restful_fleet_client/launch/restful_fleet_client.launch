@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<launch>
+    <node name="restful_fleet_client" pkg="restful_fleet_client" type="app.py"  output="screen"/>
+</launch>

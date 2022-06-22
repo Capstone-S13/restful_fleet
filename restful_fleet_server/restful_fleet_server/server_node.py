@@ -7,6 +7,7 @@ import json
 from rclpy.node import Node
 from rclpy.time import Time
 from rclpy.parameter import Parameter
+from threading import Semaphore
 
 # Qos
 from rclpy.qos import qos_profile_system_default
@@ -99,8 +100,12 @@ class ServerNode(Node):
             loc_json = self.convert_location_to_json(location)
             json_msg["path"].append(loc_json)
         json_msg["task_id"] = _msg.task_id
+        self.get_logger().info(
+            f"sending path request of length {len(json_msg['path'])}")
         self.server.send_path_request(json_msg)
-        self.get_logger().info("sending path request")
+        self.get_logger().info(
+            f"path request sent!")
+        return
 
     def handle_mode_request(self, _msg):
         return
@@ -170,7 +175,7 @@ class ServerNode(Node):
         for robot in self.robots:
             fleet_state.robots.append(self.robots[robot])
         self.fleet_state_pub.publish(fleet_state)
-        self.get_logger().info("Publishing fleet_states")
+        # self.get_logger().info("Publishing fleet_states")
 
     def publish_end_action(self, robot):
         mode_request = ModeRequest()
