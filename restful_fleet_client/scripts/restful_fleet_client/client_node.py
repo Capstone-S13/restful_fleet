@@ -211,9 +211,6 @@ class ClientNode():
         goal.target_pose.pose.orientation.z = quaternion[2]
         goal.target_pose.pose.orientation.w = quaternion[3]
 
-
-
-
         return goal
 
     def transform_to_location_json(self,transform):
