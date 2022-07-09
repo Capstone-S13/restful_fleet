@@ -24,7 +24,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'restful_fleet_server=restful_fleet_server.app:main'
+            'restful_fleet_server=restful_fleet_server.main:main'
         ],
     },
 )

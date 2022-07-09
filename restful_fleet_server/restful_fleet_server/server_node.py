@@ -7,7 +7,7 @@ import json
 from rclpy.node import Node
 from rclpy.time import Time
 from rclpy.parameter import Parameter
-from threading import Semaphore
+from threading import Semaphore, Thread
 
 # Qos
 from rclpy.qos import qos_profile_system_default
@@ -59,7 +59,11 @@ class ServerNode(Node):
             self.destination_request_cb,
             config.sub_rate)
 
+        self.spin_thread = Thread(target=self.spin_self)
+
         self.config = config
+    def spin_self(self):
+        rclpy.spin(self)
 
     def path_request_cb(self, _msg):
         self.handle_path_request(_msg)
