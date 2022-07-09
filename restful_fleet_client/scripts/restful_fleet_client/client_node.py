@@ -1,10 +1,6 @@
 from numpy import math
-from threading import Semaphore
-from requests import request
-from rx import catch
+from threading import Semaphore, Thread
 import rospy
-from std_msgs.msg import String
-from std_srvs.srv import Trigger
 from sensor_msgs.msg import BatteryState
 from tf2_ros import TransformListener, Buffer
 from tf import transformations
@@ -13,12 +9,6 @@ from geometry_msgs.msg import TransformStamped
 from move_base_msgs.msg import MoveBaseGoal, MoveBaseAction
 from actionlib import SimpleActionClient, GoalStatus
 
-# from  client import Client
-# from  client_node_config import ClientNodeConfig
-# from  utilities import is_transform_close, RobotMode
-
-from  restful_fleet_client.client import Client
-from  restful_fleet_client.client_node_config import ClientNodeConfig
 from  restful_fleet_client.utilities import is_transform_close, RobotMode
 
 class Goal():
@@ -49,11 +39,28 @@ class ClientNode():
         self.request_error= False
         self.current_task_id = ""
         self.task_validity_semaphore = Semaphore()
+        self.loop_rate = rospy.Rate(0.5)
+        self.loop_thread = Thread(target=self.loop_self, args=())
+        self.spin_thread = Thread(target=self.spin_self, args=())
 
 
     def init(self):
         # in case we need to set up some stuff
         return
+
+    def loop_self(self):
+        while not rospy.is_shutdown():
+            self.loop()
+            self.loop_rate.sleep()
+        rospy.loginfo("exiting loop thread")
+
+    def spin_self(self):
+        rospy.spin()
+        rospy.loginfo("exiting spin thread")
+
+    def start_threads(self):
+        self.loop_thread.start()
+        self.spin_thread.start()
 
     def battery_state_cb(self, msg):
         self.current_battery_state = msg
@@ -287,6 +294,7 @@ class ClientNode():
             self.move_base_client.cancel_goal()
             self.goal_path.clear()
             return
+
 
 
 

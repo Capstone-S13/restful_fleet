@@ -24,14 +24,14 @@ find_package(catkin QUIET COMPONENTS
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
+catkin_python_setup()
+
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES restful_client
 #  CATKIN_DEPENDS other_catkin_pkg
 #  DEPENDS system_lib
 )
-
-catkin_python_setup()
 
 ###########
 ## Build ##
@@ -55,7 +55,7 @@ install(
 
 
 catkin_install_python(PROGRAMS
-    scripts/app.py
+    scripts/main.py
     DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
