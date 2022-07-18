@@ -7,6 +7,14 @@ class ServerNodeConfig():
         self.fleet_state_pub_rate = 10
         self.sub_rate = 10
 
+        # scale from robot to rmf
+        self.map_scale = 1.05
+        # measured with robot reference frame
+        # distance of rmf origin from robot origin
+        self.map_translate_x = -32.306
+        self.map_translate_y = 8.186
+        self.map_rotation = 0.0
+
         # RMF
         self.fleet_state_topic = "/fleet_states"
         self.action_execution_notice_topic = "/action_execution_notice"

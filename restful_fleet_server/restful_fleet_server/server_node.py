@@ -1,8 +1,11 @@
 import imp
 from re import M
+
+
 import rclpy
 import time
 import json
+import numpy as np
 
 from rclpy.node import Node
 from rclpy.time import Time
@@ -20,8 +23,10 @@ from rclpy.qos import QoSReliabilityPolicy as Reliability
 from rmf_fleet_msgs.msg import FleetState, ModeRequest, DestinationRequest, \
     PathRequest, RobotMode, Location, RobotState
 from std_msgs.msg import String
-
 from restful_fleet_server.server_node_config import ServerNodeConfig
+
+
+
 
 class ServerNode(Node):
     def __init__(self, server, config=ServerNodeConfig()):
@@ -62,6 +67,50 @@ class ServerNode(Node):
         self.spin_thread = Thread(target=self.spin_self)
 
         self.config = config
+
+        self.rmf_to_fleet_mat =self.init_rmf_to_fleet_mat()
+
+        self.fleet_to_rmf_mat = self.init_fleet_to_rmf_mat()
+
+    def init_rmf_to_fleet_mat(self):
+        return np.array([
+            [np.cos(self.config.map_rotation), -np.sin(self.config.map_rotation),
+            0, self.config.map_scale*self.config.map_translate_x],
+
+            [np.sin(self.config.map_rotation), np.cos(self.config.map_rotation),
+            0, self.config.map_scale*self.config.map_translate_y],
+
+            [0, 0, 1, 0],
+
+            [0, 0, 0,1]
+        ])
+
+    def init_fleet_to_rmf_mat(self):
+        # origin scaled to map scale
+        scaled_origin = np.array([
+            [self.config.map_translate_x/self.config.map_scale],
+            [self.config.map_translate_y/self.config.map_scale],
+            [0]
+        ])
+        inverse_rot = np.zeros((3,3))
+
+        # get inverse of rmf to fleet rotation matrix
+        for i in range(3):
+            for j in range(3):
+                inverse_rot[j][i] = self.rmf_to_fleet_mat[i][j]
+
+        # get rmf origin wrt to fleet origin
+        inverse_origin = np.matmul(-inverse_rot, scaled_origin)
+
+        # populate the fleet to rmf transform martix with values
+        fleet_to_rmf_mat = np.zeros((4,4))
+        for i in range(len(fleet_to_rmf_mat)):
+           if i < 3:
+               fleet_to_rmf_mat[i][-1] = inverse_origin[i][0]
+           else:
+               fleet_to_rmf_mat[i][-1] = 1
+        return fleet_to_rmf_mat
+
     def spin_self(self):
         rclpy.spin(self)
 
@@ -78,15 +127,37 @@ class ServerNode(Node):
         return
 
     # this takes in type rmf_fleet_msgs.msg.Location
-    def transform_fleet_to_rmf(self, rmf_frame_location):
+    def transform_fleet_to_rmf(self, fleet_frame_location:Location):
+        rmf_frame_location = Location()
+        fleet_frame_mat = np.zeros((1,4))
+        fleet_frame_mat[0][0] = fleet_frame_location.x
+        fleet_frame_mat[1][0] = fleet_frame_location.y
+        fleet_frame_mat[3][0] = 1
+        rmf_frame_mat = np.matmul(self.fleet_to_rmf_mat, fleet_frame_mat)
+        rmf_frame_mat = rmf_frame_mat*self.config.map_scale
+        rmf_frame_location.x = rmf_frame_mat[0][0]
+        rmf_frame_location.y = rmf_frame_mat[1][0]
+        rmf_frame_location.yaw = fleet_frame_location.yaw - self.config.map_rotation
+        return fleet_frame_location
+
+    def transform_rmf_to_fleet(self, rmf_frame_location:Location):
         fleet_frame_location = Location()
+        rmf_frame_mat = np.zeros((1,4))
+        rmf_frame_mat[0][0] = rmf_frame_location.x
+        rmf_frame_mat[1][0] = rmf_frame_location.y
+        rmf_frame_mat[3][0] = 1
+        fleet_frame_mat = np.matmul(self.fleet_to_rmf_mat, rmf_frame_mat)
+        fleet_frame_mat = fleet_frame_mat/self.config.map_scale
+        fleet_frame_location.x = fleet_frame_mat[0][0]
+        fleet_frame_location.y = fleet_frame_mat[1][0]
+        fleet_frame_location.yaw = rmf_frame_location.yaw + self.config.map_rotation
         return fleet_frame_location
 
     def handle_destination_request(self, _msg):
         json_msg = {}
         json_msg["fleet_name"] = _msg.fleet_name
         json_msg["robot_name"] = _msg.robot_name
-        json_msg["destination"] = self.transform_fleet_to_rmf(_msg.destination)
+        json_msg["destination"] = self.transform_rmf_to_fleet(_msg.destination)
         self.server.send_destination_request(json_msg)
         self.get_logger().info("sending path request")
 
@@ -100,7 +171,7 @@ class ServerNode(Node):
         json_msg["path"] = []
         for i in range(len(_msg.path)):
             location = _msg.path[i]
-            # location = self.transform_fleet_to_rmf(location)
+            location = self.transform_rmf_to_fleet(location)
             loc_json = self.convert_location_to_json(location)
             json_msg["path"].append(loc_json)
         json_msg["task_id"] = _msg.task_id
@@ -202,7 +273,11 @@ class ServerNode(Node):
         robot_state.location = \
             self.convert_json_to_location(json_msg["location"])
         for location_json in json_msg["path"]:
-            robot_state.path.append(self.convert_json_to_location(location_json))
+            robot_state.path.append(
+                self.transform_fleet_to_rmf(
+                    self.convert_json_to_location(location_json)
+                )
+            )
         self.robots[json_msg["name"]] = robot_state
 
     def timer_callback(self):

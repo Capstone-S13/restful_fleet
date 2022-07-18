@@ -4,7 +4,7 @@ class ClientNodeConfig():
         self.fleet_name = "Unodopo"
         self.robot_name = "Unodopo1"
         self.robot_model = "robot_model"
-        self.level_name = "level_name"
+        self.level_name = "L1"
         self.battery_topic = "/battery_state"
         self.map_frame = "map"
         self.robot_frame = "base_link"
