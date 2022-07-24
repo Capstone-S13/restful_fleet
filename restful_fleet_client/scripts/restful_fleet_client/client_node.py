@@ -38,7 +38,8 @@ class ClientNode():
         self.paused = False
         self.request_error= False
         self.current_task_id = ""
-        self.task_validity_semaphore = Semaphore()
+        self.task_id_semaphore = Semaphore()
+        self.goal_path_semaphore = Semaphore()
         self.loop_rate = rospy.Rate(0.5)
         self.loop_thread = Thread(target=self.loop_self, args=())
         self.spin_thread = Thread(target=self.spin_self, args=())
@@ -72,15 +73,15 @@ class ClientNode():
 
     def is_valid_request(self, request_fleet_name, request_robot_name,\
         request_task_id) -> bool:
-        self.task_validity_semaphore.acquire()
+        self.task_id_semaphore.acquire()
         if (self.current_task_id == request_task_id\
             or self.config.robot_name != request_robot_name\
             or self.config.fleet_name != request_fleet_name):
             rospy.loginfo("not a valid request")
-            self.task_validity_semaphore.release()
+            self.task_id_semaphore.release()
             return False
         self.current_task_id = request_task_id
-        self.task_validity_semaphore.release()
+        self.task_id_semaphore.release()
         return True
 
     def get_robot_transform(self) -> bool:
@@ -153,8 +154,9 @@ class ClientNode():
                 self.goal_path.append(goal)
             # we wanna move the setting of the task id to be
             # part of the critical section in the is valid request section
+            self.task_id_semaphore.acquire()
             self.current_task_id = path_req_json["task_id"]
-
+            self.task_id_semaphore.release()
             if self.paused:
                 self.paused = False
             self.request_error = False
@@ -176,7 +178,9 @@ class ClientNode():
         robot_state_json["fleet_name"] = self.config.fleet_name
         robot_state_json["name"] = self.config.robot_name
         robot_state_json["model"] = self.config.robot_model
+        self.task_id_semaphore.acquire()
         robot_state_json["task_id"] = self.current_task_id
+        self.task_id_semaphore.release()
         robot_state_json["battery_percent"] = 100*self.current_battery_state.percentage
         robot_state_json["robot_mode"] = self.get_robot_mode()
         robot_state_json["location"] = self.transform_to_location_json(self.current_robot_transform)

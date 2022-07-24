@@ -1,5 +1,6 @@
 import sys
 import os
+from urllib.error import HTTPError
 
 import requests
 from http import HTTPStatus
@@ -63,8 +64,11 @@ class Server():
         url = self.get_url(self.config.path_request_route)
         try:
             resp = requests.post(url, json=json_msg)
+            resp.raise_for_status()
             self.logger.info(f"path request send status: {resp.status_code}")
-        except:
+        except HTTPError as e:
+            self.logger().info(f'HTTP error: {e}')
+        except Exception as e:
             self.logger.info("client not up")
 
 
