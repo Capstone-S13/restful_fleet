@@ -40,6 +40,7 @@ class ServerNode(Node):
         self.server.logger = self.get_logger()
         self.timer = self.create_timer(config.timer_period, self.timer_callback)
         self.robots = {}
+        self.robot_state_sem = Semaphore()
 
         self.fleet_state_pub = self.create_publisher(FleetState,
             config.fleet_state_topic, config.fleet_state_pub_rate)
@@ -75,23 +76,24 @@ class ServerNode(Node):
     def init_rmf_to_fleet_mat(self):
         return np.array([
             [np.cos(self.config.map_rotation), -np.sin(self.config.map_rotation),
-            0, self.config.map_scale*self.config.map_translate_x],
+            0.0, self.config.map_translate_x],
 
             [np.sin(self.config.map_rotation), np.cos(self.config.map_rotation),
-            0, self.config.map_scale*self.config.map_translate_y],
+            0.0, self.config.map_translate_y],
 
-            [0, 0, 1, 0],
+            [0.0, 0.0, 1.0, 0.0],
 
-            [0, 0, 0,1]
+            [0.0, 0.0, 0.0,1.0]
         ])
 
     def init_fleet_to_rmf_mat(self):
         # origin scaled to map scale
         scaled_origin = np.array([
-            [self.config.map_translate_x/self.config.map_scale],
-            [self.config.map_translate_y/self.config.map_scale],
-            [0]
+            [self.config.map_translate_x],
+            [self.config.map_translate_y],
+            [0.0]
         ])
+
         inverse_rot = np.zeros((3,3))
 
         # get inverse of rmf to fleet rotation matrix
@@ -102,13 +104,18 @@ class ServerNode(Node):
         # get rmf origin wrt to fleet origin
         inverse_origin = np.matmul(-inverse_rot, scaled_origin)
 
-        # populate the fleet to rmf transform martix with values
+        # initialise the fleet to rmf transform matrix
         fleet_to_rmf_mat = np.zeros((4,4))
+        for i in range(len(inverse_rot)):
+            for j in range(len(inverse_rot[i])):
+                fleet_to_rmf_mat[i][j] = inverse_rot[j][i]
+
+        # populate the fleet to rmf transform martix with values
         for i in range(len(fleet_to_rmf_mat)):
            if i < 3:
                fleet_to_rmf_mat[i][-1] = inverse_origin[i][0]
            else:
-               fleet_to_rmf_mat[i][-1] = 1
+               fleet_to_rmf_mat[i][-1] = 1.0
         return fleet_to_rmf_mat
 
     def spin_self(self):
@@ -128,30 +135,28 @@ class ServerNode(Node):
 
     # this takes in type rmf_fleet_msgs.msg.Location
     def transform_fleet_to_rmf(self, fleet_frame_location:Location):
-        rmf_frame_location = Location()
-        fleet_frame_mat = np.zeros((1,4))
+        fleet_frame_mat = np.zeros((4,1))
         fleet_frame_mat[0][0] = fleet_frame_location.x
         fleet_frame_mat[1][0] = fleet_frame_location.y
-        fleet_frame_mat[3][0] = 1
+        fleet_frame_mat[3][0] = 1.0
         rmf_frame_mat = np.matmul(self.fleet_to_rmf_mat, fleet_frame_mat)
         rmf_frame_mat = rmf_frame_mat*self.config.map_scale
-        rmf_frame_location.x = rmf_frame_mat[0][0]
-        rmf_frame_location.y = rmf_frame_mat[1][0]
-        rmf_frame_location.yaw = fleet_frame_location.yaw - self.config.map_rotation
+        fleet_frame_location.x = rmf_frame_mat[0][0]
+        fleet_frame_location.y = rmf_frame_mat[1][0]
+        fleet_frame_location.yaw = fleet_frame_location.yaw - self.config.map_rotation
         return fleet_frame_location
 
     def transform_rmf_to_fleet(self, rmf_frame_location:Location):
-        fleet_frame_location = Location()
-        rmf_frame_mat = np.zeros((1,4))
+        rmf_frame_mat = np.zeros((4,1))
         rmf_frame_mat[0][0] = rmf_frame_location.x
         rmf_frame_mat[1][0] = rmf_frame_location.y
-        rmf_frame_mat[3][0] = 1
-        fleet_frame_mat = np.matmul(self.fleet_to_rmf_mat, rmf_frame_mat)
+        rmf_frame_mat[3][0] = 1.0
+        fleet_frame_mat = np.matmul(self.rmf_to_fleet_mat, rmf_frame_mat)
         fleet_frame_mat = fleet_frame_mat/self.config.map_scale
-        fleet_frame_location.x = fleet_frame_mat[0][0]
-        fleet_frame_location.y = fleet_frame_mat[1][0]
-        fleet_frame_location.yaw = rmf_frame_location.yaw + self.config.map_rotation
-        return fleet_frame_location
+        rmf_frame_location.x = fleet_frame_mat[0][0]
+        rmf_frame_location.y = fleet_frame_mat[1][0]
+        rmf_frame_location.yaw = rmf_frame_location.yaw + self.config.map_rotation
+        return rmf_frame_location
 
     def handle_destination_request(self, _msg):
         json_msg = {}
@@ -193,17 +198,17 @@ class ServerNode(Node):
         return
 
     def convert_location_to_json(self, location):
-        locaction_json = {}
-        locaction_json["t"] = {"sec" : location.t.sec,
+        location_json = {}
+        location_json["t"] = {"sec" : location.t.sec,
             "nanosec": location.t.nanosec}
-        locaction_json["x"] = location.x
-        locaction_json["y"] = location.y
-        locaction_json["yaw"] = location.yaw
-        locaction_json["obey_approach_speed_limit"] = False
-        locaction_json["approach_speed_limit"] = location.approach_speed_limit
-        locaction_json["level_name"] = location.level_name
-        locaction_json["index"] = location.index
-        return locaction_json
+        location_json["x"] = location.x
+        location_json["y"] = location.y
+        location_json["yaw"] = location.yaw
+        location_json["obey_approach_speed_limit"] = False
+        location_json["approach_speed_limit"] = location.approach_speed_limit
+        location_json["level_name"] = location.level_name
+        location_json["index"] = location.index
+        return location_json
 
     def convert_json_to_location(self, location_json) -> Location:
         location = Location()
@@ -248,7 +253,9 @@ class ServerNode(Node):
         fleet_state = FleetState()
         fleet_state.name = self.config.fleet_name
         for robot in self.robots:
+            self.robot_state_sem.acquire()
             fleet_state.robots.append(self.robots[robot])
+            self.robot_state_sem.release()
         self.fleet_state_pub.publish(fleet_state)
         # self.get_logger().info("Publishing fleet_states")
 
@@ -268,17 +275,23 @@ class ServerNode(Node):
         robot_state.model = json_msg["model"]
         robot_state.task_id = json_msg["task_id"]
         robot_state.battery_percent = float(json_msg["battery_percent"])
+        robot_state.battery_percent = 100.0
         # convert robot mode
         robot_state.mode.mode = json_msg["robot_mode"]
         robot_state.location = \
-            self.convert_json_to_location(json_msg["location"])
+            self.transform_fleet_to_rmf(
+                self.convert_json_to_location(json_msg["location"])
+            )
         for location_json in json_msg["path"]:
             robot_state.path.append(
                 self.transform_fleet_to_rmf(
                     self.convert_json_to_location(location_json)
                 )
             )
+        # self.get_logger().info(robot_state)
+        self.robot_state_sem.acquire()
         self.robots[json_msg["name"]] = robot_state
+        self.robot_state_sem.release()
 
     def timer_callback(self):
         self.publish_fleet_state()
