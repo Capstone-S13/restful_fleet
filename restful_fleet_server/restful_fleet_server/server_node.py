@@ -191,8 +191,7 @@ class ServerNode(Node):
         return
 
     def handle_perform_action_request(self, _msg):
-        json_msg = {}
-        json_msg["data"] = _msg.data
+        json_msg = json.loads(_msg['data'])
         self.server.send_perform_action_request(json_msg)
         self.get_logger().info(f"sending perform action request: {_msg}")
         return

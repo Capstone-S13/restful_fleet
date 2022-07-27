@@ -1,3 +1,4 @@
+import os
 
 class ClientNodeConfig():
     def __init__(self):
@@ -11,6 +12,8 @@ class ClientNodeConfig():
         self.move_base_server_name = "move_base"
         self.docking_trigger_name =""
         self.max_dist_to_first_waypoint = 10.0
+        self.map_directory = os.path.join(os.path.expanduser('~'), 'tmp')
+        self.actions = ['eject_robot', 'hub_collect', 'hub_deposit']
 
     def print_config(self):
         return

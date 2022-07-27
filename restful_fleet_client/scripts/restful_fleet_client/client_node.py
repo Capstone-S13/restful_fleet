@@ -1,15 +1,22 @@
+from ast import Load
+import base64
+import os
 from numpy import math
 from threading import Semaphore, Thread
+
+import yaml
 import rospy
 from sensor_msgs.msg import BatteryState
 from tf2_ros import TransformListener, Buffer
 from tf import transformations
-from geometry_msgs.msg import TransformStamped
+from geometry_msgs.msg import TransformStamped, PoseWithCovarianceStamped
 
 from move_base_msgs.msg import MoveBaseGoal, MoveBaseAction
 from actionlib import SimpleActionClient, GoalStatus
+from nav_msgs.srv import LoadMapRequest, LoadMap
 
 from  restful_fleet_client.utilities import is_transform_close, RobotMode
+from restful_fleet_client.client_node_config import ClientNodeConfig
 
 class Goal():
     def __init__(self):
@@ -21,7 +28,7 @@ class Goal():
 
 
 class ClientNode():
-    def __init__(self,config, client):
+    def __init__(self,config: ClientNodeConfig, client):
         self.config = config
         self.client = client
         self.battery_sub = rospy.Subscriber(self.config.battery_topic,\
@@ -43,6 +50,11 @@ class ClientNode():
         self.loop_rate = rospy.Rate(0.5)
         self.loop_thread = Thread(target=self.loop_self, args=())
         self.spin_thread = Thread(target=self.spin_self, args=())
+
+        # for map change feature
+        self.map_service_client = rospy.ServiceProxy('change_map', LoadMap)
+        self.initial_pose_pub = rospy.Publisher('initialpose',
+                PoseWithCovarianceStamped, queue_size=10)
 
 
     def init(self):
@@ -171,7 +183,99 @@ class ClientNode():
         return
 
     def receive_perform_action(self, perform_action_json):
+        category = perform_action_json['category']
+        description = perform_action_json['description']
+        action = getattr(self, category)
+        action(description)
         return
+
+    def eject_robot(self,description):
+        rospy.loginfo("ejecting robot")
+        initial_pose  = description['initial_pose']
+        map_json = description['map']
+        new_host_json = description['new_host']
+
+        self.end_action()
+        self.change_host(new_host_json)
+        self.change_map(map_json)
+        self.initialise_pose(initial_pose)
+        return
+
+    def change_host(self, new_host_json):
+        # TODO: there should be a way to implement a way for clients to be
+        # discovered and know their IP and port.
+        self.client.client_config.server_ip = new_host_json['ip']
+        self.client.client_config.server_port = new_host_json['ip']
+        return
+
+
+    # changes the navigation map
+    def change_map(self, map_json) -> bool:
+        # NOTE: this implementation saves the map data into yaml and pgm files.
+        # This is an convenient for us to just call the 'change_map' service,
+        # but it is an inefficient method, since it involves saving the map and
+        # invoking a service call which will read the map files again.
+        # A better method would be invoking the map change directly with the
+        # byte string and meta data received in map_json.
+        pgm_b64 = map_json['pgm']
+        pgm_data = base64.b64decode(pgm_b64)
+        del map_json['pgm']
+        path = self.config.map_directory
+        pgm_filepath = os.path.join(path, map_json['image'])
+        # TODO: should not assume the file is a pgm file
+        yaml_filepath = os.path.join(path, f"{map_json['image'].split('.')[0]}")
+
+        try:
+            # create yaml file
+            f = open(yaml_filepath, 'w')
+            f.write(yaml.dump(map_json))
+            f.close()
+
+            # create image file
+            f = open(pgm_filepath, 'wb')
+            f.write(pgm_data)
+            f.close()
+
+        except Exception as e:
+            print(f"exception: {e}")
+            return False
+
+        map_request = LoadMapRequest()
+        map_request.map_url = yaml_filepath
+        self.map_service_client(map_request)
+        return True
+
+    def initialise_pose(self, initial_pose):
+        msg  = PoseWithCovarianceStamped()
+        msg.header.frame_id = self.config.map_frame
+        msg.header.stamp = rospy.Time.now()
+        msg.pose.pose.position.x = float(initial_pose[0])
+        msg.pose.pose.position.y = float(initial_pose[1])
+        msg.pose.pose.position.z = float(initial_pose[2])
+
+        # convert euler to quaternion
+        q = transformations.quaternion_from_euler(
+            initial_pose[3], initial_pose[4], initial_pose[5])
+
+        msg.pose.pose.orientation.x = float(q[0])
+        msg.pose.pose.orientation.y = float(q[1])
+        msg.pose.pose.orientation.z = float(q[2])
+        msg.pose.pose.orientation.w = float(q[3])
+
+        self.initial_pose_pub.publish(msg)
+
+    def end_action(self):
+        self.task_id_semaphore.acquire()
+        self.current_task_id = "end_action"
+        self.task_id_semaphore.release()
+        self.goal_path_semaphore.acquire()
+        self.goal_path.clear()
+        self.goal_path.clear()
+        self.paused = True
+        # end_action_json = {}
+        # end_action_json['robot'] = {'id': self.config.robot_name}
+        # self.client.send_end_action()
+
 
     def send_robot_state(self):
         robot_state_json = {}

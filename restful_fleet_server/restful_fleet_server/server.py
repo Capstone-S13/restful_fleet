@@ -40,8 +40,8 @@ class Server():
 
         @self.app.route(self.config.end_action_route, methods=['POST'])
         def end_perform_action():
-            #
-            robot = request.json["robot"]
+            
+            robot = request.json['robot']['id']
             self.server_node.publish_end_action(robot)
             return self.app.response_class(status=200)
 
