@@ -1,4 +1,3 @@
-from websockets import server
 from restful_fleet_server.server_config import ServerConfig
 from restful_fleet_server.server import Server
 from restful_fleet_server.server_node_config import ServerNodeConfig

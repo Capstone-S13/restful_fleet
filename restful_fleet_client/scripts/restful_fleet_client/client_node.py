@@ -205,7 +205,7 @@ class ClientNode():
         # TODO: there should be a way to implement a way for clients to be
         # discovered and know their IP and port.
         self.client.client_config.server_ip = new_host_json['ip']
-        self.client.client_config.server_port = new_host_json['ip']
+        self.client.client_config.server_port = new_host_json['port']
         return
 
 
@@ -265,13 +265,16 @@ class ClientNode():
         self.initial_pose_pub.publish(msg)
 
     def end_action(self):
+        # end action
+        self.paused = True
         self.task_id_semaphore.acquire()
         self.current_task_id = "end_action"
         self.task_id_semaphore.release()
+
         self.goal_path_semaphore.acquire()
         self.goal_path.clear()
-        self.goal_path.clear()
-        self.paused = True
+        self.goal_path_semaphore.release()
+
         # end_action_json = {}
         # end_action_json['robot'] = {'id': self.config.robot_name}
         # self.client.send_end_action()

@@ -42,20 +42,20 @@ class Client():
         def handle_perform_action():
             perform_action_request = request.json
             rospy.loginfo(f"received perform action request")
+            response = self.app.response_class(status=HTTPStatus.NOT_ACCEPTABLE.value)
             try:
                 if (perform_action_request["robot"] != self.client_node.config.robot_name):
-                    response = self.app.response_class(status=HTTPStatus.NOT_ACCEPTABLE.value)
                     return response
                 try:
                     self.client_node.receive_perform_action(perform_action_request)
                     response = self.app.response_class(status=200)
                     return response
                 except Exception as e:
-                    response = self.app.response_class(status=HTTPStatus.NOT_ACCEPTABLE.value)
                     rospy.loginfo(f'Exception {e}')
                     return response
             except Exception as e:
                 rospy.loginfo(f'Exception {e}')
+                return response
 
     def run_server(self):
         self.app.run(host= self.client_config.client_ip,
