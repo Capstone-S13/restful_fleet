@@ -22,8 +22,12 @@ class Goal():
 
 class ClientNode():
     def __init__(self,config, client):
+
         self.config = config
         self.client = client
+        self.set_config()
+        self.config.print_config()
+
         self.battery_sub = rospy.Subscriber(self.config.battery_topic,\
             BatteryState, self.battery_state_cb,queue_size=10)
         self.current_battery_state = BatteryState()
@@ -48,6 +52,37 @@ class ClientNode():
     def init(self):
         # in case we need to set up some stuff
         return
+
+    def set_config(self):
+        # client node config
+        _ns="~"
+        try:
+            _ns = "~"
+            self.config.fleet_name = rospy.get_param(f'{_ns}/fleet_name')
+            self.config.robot_name = rospy.get_param(f'{_ns}/robot_name')
+            self.config.robot_model = rospy.get_param(f'{_ns}/robot_model')
+            self.config.level_name = rospy.get_param(f'{_ns}/level_name')
+            self.config.battery_topic = rospy.get_param(f'{_ns}/battery_topic')
+            self.config.map_frame = rospy.get_param(f'{_ns}/map_frame')
+            self.config.robot_frame = rospy.get_param(f'{_ns}/robot_frame')
+            self.config.move_base_server_name = rospy.get_param(f'{_ns}/move_base_server_name')
+            self.config.docking_trigger_name = rospy.get_param(f'{_ns}/docking_trigger_name')
+            self.config.max_dist_to_first_waypoint = rospy.get_param(f'{_ns}/max_dist_to_first_waypoint')
+
+            # client config
+            self.client.client_config.server_ip =  rospy.get_param(f'{_ns}/server_ip')
+            self.client.client_config.server_port =  rospy.get_param(f'{_ns}/server_port')
+            self.client.client_config.client_ip =  rospy.get_param(f'{_ns}/client_ip')
+            self.client.client_config.client_port =  rospy.get_param(f'{_ns}/client_port')
+            self.client.client_config.mode_request_route =  rospy.get_param(f'{_ns}/mode_request_route')
+            self.client.client_config.path_request_route =  rospy.get_param(f'{_ns}/path_request_route')
+            self.client.client_config.perform_action_route =  rospy.get_param(f'{_ns}/perform_action_route')
+            self.client.client_config.robot_state_route =  rospy.get_param(f'{_ns}/robot_state_route')
+            self.client.client_config.perform_action_route =  rospy.get_param(f'{_ns}/perform_action_route')
+            self.client.client_config.end_action_route =  rospy.get_param(f'{_ns}/end_action_route')
+
+        except rospy.ROSException as e:
+            print(f'Exception: {e}')
 
     def loop_self(self):
         while not rospy.is_shutdown():

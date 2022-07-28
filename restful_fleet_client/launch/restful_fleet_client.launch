@@ -1,4 +1,30 @@
 <?xml version="1.0"?>
 <launch>
-    <node name="restful_fleet_client" pkg="restful_fleet_client" type="app.py"  output="screen"/>
+    <node name="" pkg="restful_fleet_client"
+            type="main.py"  output="screen">
+
+        <!-- client parameters -->
+        <param name="server_ip" type="string" value="0.0.0.0"/>
+        <param name="server_port" type="int" value="9002"/>
+        <param name="client_ip" type="string" value="0.0.0.0"/>
+        <param name="client_port" type="int" value="9001"/>
+        <param name="mode_request_route" type="string" value="/mode-state"/>
+        <param name="path_request_route" type="string" value="/path-request"/>
+        <param name="robot_state_route" type="string" value="/robot-state"/>
+        <param name="perform_action_route" type="string" value="/perform-action"/>
+        <param name="end_action_route" type="string" value="/end-action"/>
+
+        <!-- client node parameters  -->
+        <param name="fleet_name" type="string" value="Unodopo"/>
+        <param name="robot_name" type="string" value="Unodopo2"/>
+        <param name="robot_model" type="string" value="robot_model"/>
+        <param name="level_name" type="string" value="L1"/>
+        <param name="battery_topic" type="string" value="/battery_state"/>
+        <param name="map_frame" type="string" value="map"/>
+        <param name="robot_frame" type="string" value="base_link"/>
+        <param name="move_base_server_name" type="string" value="move_base"/>
+        <param name="docking_trigger_name" type="string" value=""/>
+        <param name="max_dist_to_first_waypoint" type="double" value="10.0"/>
+    </node>
+
 </launch>
