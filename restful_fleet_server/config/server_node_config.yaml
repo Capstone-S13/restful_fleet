@@ -1,0 +1,29 @@
+restful_server_config:
+  ros__parameters:
+    # server
+    server_ip: "0.0.0.0"
+    server_port: 9000
+    client_ip: "0.0.0.0"
+    client_port: 9001
+
+    robot_state_route: /robot-state
+    mode_request_route: /mode-request
+    path_request_route: /path-request
+    end_action_route: /end-action
+    perform_action_route: /perform-action
+    fleet_name: Unodopo
+    timer_period: 0.5
+    fleet_state_pub_rate: 10
+    sub_rate: 10
+
+    # server node
+    map_scale: 1.00
+    map_translate_x: -34.172
+    map_translate_y: 8.74
+    map_rotation: 0.0
+
+    fleet_state_topic: /fleet_states
+    action_execution_notice_topic: /action_execution_notice
+    path_request_topic: /robot_path_requests
+    perform_action_topic: /Unodopo/perform_action
+    mode_request_topic: /robot_mode_request
