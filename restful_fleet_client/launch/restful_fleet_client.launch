@@ -5,7 +5,7 @@
 
         <!-- client parameters -->
         <param name="server_ip" type="string" value="0.0.0.0"/>
-        <param name="server_port" type="int" value="9002"/>
+        <param name="server_port" type="int" value="9000"/>
         <param name="client_ip" type="string" value="0.0.0.0"/>
         <param name="client_port" type="int" value="9001"/>
         <param name="mode_request_route" type="string" value="/mode-state"/>

@@ -89,7 +89,6 @@ class ClientNode():
             self.client.client_config.path_request_route =  rospy.get_param(f'{_ns}/path_request_route')
             self.client.client_config.perform_action_route =  rospy.get_param(f'{_ns}/perform_action_route')
             self.client.client_config.robot_state_route =  rospy.get_param(f'{_ns}/robot_state_route')
-            self.client.client_config.perform_action_route =  rospy.get_param(f'{_ns}/perform_action_route')
             self.client.client_config.end_action_route =  rospy.get_param(f'{_ns}/end_action_route')
 
         except rospy.ROSException as e:
@@ -149,11 +148,10 @@ class ClientNode():
 
     def get_robot_mode(self):
         if self.request_error:
-            RobotMode.MODE_ADAPTER_ERROR.value
-            return
+            return RobotMode.MODE_ADAPTER_ERROR.value
         if self.emergency:
-            RobotMode.MODE_EMERGENCY.value
-            return
+            return RobotMode.MODE_EMERGENCY.value
+
         if self.current_battery_state.power_supply_status ==\
             self.current_battery_state.POWER_SUPPLY_STATUS_CHARGING:
             # Robot is charging

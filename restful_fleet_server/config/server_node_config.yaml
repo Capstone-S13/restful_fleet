@@ -1,4 +1,4 @@
-restful_server_config:
+restful_fleet_server:
   ros__parameters:
     # server
     server_ip: "0.0.0.0"
