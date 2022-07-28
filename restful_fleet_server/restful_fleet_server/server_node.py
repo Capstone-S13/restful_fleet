@@ -36,7 +36,15 @@ class ServerNode(Node):
                 depth=1,
                 reliability=Reliability.RELIABLE,
                 durability=Durability.TRANSIENT_LOCAL)
+        self.config = config
         self.server = server
+
+        # setup and print configurations
+        self.declare_config()
+        self.setup_config()
+        self.config.print_config()
+        self.server.config.print_config()
+
         self.server.logger = self.get_logger()
         self.timer = self.create_timer(config.timer_period, self.timer_callback)
         self.robots = {}
@@ -72,6 +80,52 @@ class ServerNode(Node):
         self.rmf_to_fleet_mat =self.init_rmf_to_fleet_mat()
 
         self.fleet_to_rmf_mat = self.init_fleet_to_rmf_mat()
+
+    def declare_config(self):
+        self.declare_parameter('fleet_name', self.config.fleet_name)
+        self.declare_parameter('timer_period', self.config.timer_period)
+        self.declare_parameter('fleet_state_pub_rate', self.config.fleet_state_pub_rate)
+        self.declare_parameter('map_scale', self.config.map_scale)
+        self.declare_parameter('map_translate_x', self.config.map_translate_x)
+        self.declare_parameter('map_translate_y', self.config.map_translate_y)
+        self.declare_parameter('map_rotation', self.config.map_rotation)
+        self.declare_parameter('fleet_state_topic', self.config.fleet_state_topic)
+        self.declare_parameter('action_execution_notice_topic', self.config.action_execution_notice_topic)
+        self.declare_parameter('path_request_topic', self.config.path_request_topic)
+        self.declare_parameter('mode_request_topic', self.config.mode_request_topic)
+
+        self.declare_parameter('server_ip', self.server.config.server_ip)
+        self.declare_parameter('server_port', self.server.config.server_port)
+        self.declare_parameter('client_ip', self.server.config.client_ip)
+        self.declare_parameter('client_port', self.server.config.client_port)
+        self.declare_parameter('robot_state_route', self.server.config.robot_state_route)
+        self.declare_parameter('mode_request_route', self.server.config.mode_request_route)
+        self.declare_parameter('end_action_route', self.server.config.end_action_route)
+        self.declare_parameter('perform_action_route', self.server.config.perform_action_request_route)
+
+    def setup_config(self):
+        # server node configurations
+        self.config.fleet_name = self.get_parameter('fleet_name').get_parameter_value().string_value
+        self.config.timer_period = self.get_parameter('timer_period').get_parameter_value().double_value
+        self.config.fleet_state_pub_rate = self.get_parameter('fleet_state_pub_rate').get_parameter_value().integer_value
+        self.config.map_scale = self.get_parameter('map_scale').get_parameter_value().double_value
+        self.config.map_translate_x = self.get_parameter('map_translate_x').get_parameter_value().double_value
+        self.config.map_translate_y = self.get_parameter('map_translate_y').get_parameter_value().double_value
+        self.config.map_rotation = self.get_parameter('map_rotation').get_parameter_value().double_value
+        self.config.fleet_state_topic = self.get_parameter('fleet_state_topic').get_parameter_value().string_value
+        self.config.action_execution_notice_topic = self.get_parameter('action_execution_notice_topic').get_parameter_value().string_value
+        self.config.path_request_topic = self.get_parameter('path_request_topic').get_parameter_value().string_value
+        self.config.mode_request_topic = self.get_parameter('mode_request_topic').get_parameter_value().string_value
+
+        self.server.config.server_ip = self.get_parameter('server_ip').get_parameter_value().string_value
+        self.server.config.server_port = self.get_parameter('server_port').get_parameter_value().integer_value
+        self.server.config.client_ip = self.get_parameter('client_ip').get_parameter_value().string_value
+        self.server.config.client_port = self.get_parameter('client_port').get_parameter_value().integer_value
+        self.server.config.robot_state_route = self.get_parameter('robot_state_route').get_parameter_value().string_value
+        self.server.config.mode_request_route = self.get_parameter('mode_request_route').get_parameter_value().string_value
+        self.server.config.end_action_route = self.get_parameter('end_action_route').get_parameter_value().string_value
+        self.server.config.perform_action_request_route = self.get_parameter('perform_action_route').get_parameter_value().string_value
+
 
     def init_rmf_to_fleet_mat(self):
         return np.array([
@@ -118,6 +172,7 @@ class ServerNode(Node):
                fleet_to_rmf_mat[i][-1] = 1.0
         return fleet_to_rmf_mat
 
+
     def spin_self(self):
         rclpy.spin(self)
 
@@ -133,8 +188,7 @@ class ServerNode(Node):
         self.handle_destination_request(_msg)
         return
 
-    # this takes in type rmf_fleet_msgs.msg.Location
-    def transform_fleet_to_rmf(self, fleet_frame_location:Location):
+    def transform_fleet_to_rmf(self, fleet_frame_location:Location) -> Location:
         fleet_frame_mat = np.zeros((4,1))
         fleet_frame_mat[0][0] = fleet_frame_location.x
         fleet_frame_mat[1][0] = fleet_frame_location.y
@@ -146,7 +200,7 @@ class ServerNode(Node):
         fleet_frame_location.yaw = fleet_frame_location.yaw - self.config.map_rotation
         return fleet_frame_location
 
-    def transform_rmf_to_fleet(self, rmf_frame_location:Location):
+    def transform_rmf_to_fleet(self, rmf_frame_location:Location) -> Location:
         rmf_frame_mat = np.zeros((4,1))
         rmf_frame_mat[0][0] = rmf_frame_location.x
         rmf_frame_mat[1][0] = rmf_frame_location.y

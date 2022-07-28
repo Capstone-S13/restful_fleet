@@ -1,3 +1,4 @@
+import rclpy
 
 class ServerNodeConfig():
     def __init__(self):
@@ -29,8 +30,24 @@ class ServerNodeConfig():
         self.path_request_route = "/path-request"
         self.perform_action_request_route = "/perform-action"
 
-    def _get_params(self):
-        return
 
-    def print_settings(self):
-        return
+    def print_config(self):
+        print(f'Node Name: {self.node_name}')
+        print(f'Fleet Name: {self.fleet_name}')
+        print(f'Timer Period: {self.timer_period}')
+        print(f'Fleet State Pub Rate: {self.fleet_state_pub_rate}')
+        print(f'Subscriber Rate: {self.sub_rate}')
+        print(f'Map Scale: {self.map_scale}')
+        print(f'Map Translate X: {self.map_translate_x}')
+        print(f'Map Translate Y: {self.map_translate_y}')
+        print(f'Map Rotation: {self.map_rotation}')
+        print(f'Fleet State Topic: {self.fleet_state_topic}')
+        print(f'Action Execution Notice topic: {self.action_execution_notice_topic}')
+        print(f'Path Request Topic: {self.path_request_topic}')
+        print(f'Perform Action: {self.perform_action_topic}')
+        print(f'Destination Request: {self.destination_request_topic}')
+        print(f'Mode Request Topic: {self.mode_request_topic}')
+        print(f'Robot State Route: {self.robot_state_route}')
+        print(f'Mode Request Route: {self.mode_request_route}')
+        print(f'Path Request Route: {self.path_request_route}')
+        print(f'Perform Action Request Route: {self.perform_action_request_route}')

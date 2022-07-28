@@ -9,12 +9,17 @@ import os
 
 def generate_launch_description():
 
+    params = os.path.join(
+        get_package_share_directory('restful_fleet_server'),
+        'server_node_config.yaml'
+    )
+
     return LaunchDescription([
         Node(
             package='restful_fleet_server',
             executable='restful_fleet_server',
             name='restful_fleet_server',
             output="screen",
-            parameters=[]
+            parameters=[params]
         ),
     ])
