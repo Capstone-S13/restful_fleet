@@ -41,7 +41,7 @@ class Client():
         @self.app.route(self.client_config.perform_action_route, methods=['POST'])
         def handle_perform_action():
             perform_action_request = request.json
-            rospy.loginfo(f"received perform action request")
+            rospy.loginfo(f"received perform action request for action: {perform_action_request['category']}")
             response = self.app.response_class(status=HTTPStatus.NOT_ACCEPTABLE.value)
             try:
                 if (perform_action_request["robot"] != self.client_node.config.robot_name):

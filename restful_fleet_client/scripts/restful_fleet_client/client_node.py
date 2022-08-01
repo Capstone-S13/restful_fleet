@@ -1,11 +1,16 @@
-from ast import Load
 import base64
 import os
+import time
+import yaml
+import rospy
+
+import rclpy
+from rclpy.node import Node
+from rclpy.action import ActionClient
+
 from numpy import math
 from threading import Semaphore, Thread
 
-import yaml
-import rospy
 from sensor_msgs.msg import BatteryState
 from tf2_ros import TransformListener, Buffer
 from tf import transformations
@@ -15,8 +20,15 @@ from move_base_msgs.msg import MoveBaseGoal, MoveBaseAction
 from actionlib import SimpleActionClient, GoalStatus
 from nav_msgs.srv import LoadMapRequest, LoadMap
 
-from  restful_fleet_client.utilities import is_transform_close, RobotMode
+from restful_fleet_client.utilities import is_transform_close, RobotMode
 from restful_fleet_client.client_node_config import ClientNodeConfig
+
+from vs_interfaces.msg import VisionServoActionGoal, VisionServoActionAction
+from payload_interfaces.msg import PayLoadActionGoal, PayLoadActionAction, PayLoadMode
+
+from hub_interfaces.msg import HubOperation
+from hub_interfaces.srv import HubService
+from hub_interfaces.action import HubAction
 
 class Goal():
     def __init__(self):
@@ -40,7 +52,8 @@ class ClientNode():
         self.previous_robot_transform = TransformStamped()
         self.current_robot_transform = TransformStamped()
         self.goal_path = []
-        self.move_base_client = SimpleActionClient(self.config.move_base_server_name, MoveBaseAction)
+        self.move_base_client = \
+            SimpleActionClient(self.config.move_base_server_name,MoveBaseAction)
         self.tf2_buffer = Buffer()
         self.tf2_listener = TransformListener(self.tf2_buffer)
         self.max_tries = 5
@@ -54,10 +67,23 @@ class ClientNode():
         self.loop_thread = Thread(target=self.loop_self, args=())
         self.spin_thread = Thread(target=self.spin_self, args=())
 
+        # for docking
+        self.docking_action_client = SimpleActionClient('vs_action', VisionServoActionAction)
+
+        # for slider
+        self.payload_action_client = SimpleActionClient('payload_action', PayLoadActionAction)
+
         # for map change feature
         self.map_service_client = rospy.ServiceProxy('change_map', LoadMap)
         self.initial_pose_pub = rospy.Publisher('initialpose',
                 PoseWithCovarianceStamped, queue_size=10)
+
+        # ROS 2
+        self.ros2_node = rclpy.create_node('restful_fleet_client')
+
+        # for hub actions and services
+        self.hub_service_client = self.ros2_node.create_client(HubService, 'hub_service')
+        self.hub_action_client = ActionClient(self.ros2_node, HubAction, 'hub_action')
 
 
     def init(self):
@@ -103,6 +129,10 @@ class ClientNode():
     def spin_self(self):
         rospy.spin()
         rospy.loginfo("exiting spin thread")
+
+    def spin_self_2(self):
+        while not rclpy.shutdown():
+            rclpy.spin_once()
 
     def start_threads(self):
         self.loop_thread.start()
@@ -218,8 +248,201 @@ class ClientNode():
         category = perform_action_json['category']
         description = perform_action_json['description']
         action = getattr(self, category)
-        action(description)
+        try:
+            action(description)
+        except Exception as e:
+            rospy.logwarn(f"Peform Action exception: {e}")
+
+    # collecting from hub
+    def hub_collect(self, description):
+        rospy.loginfo('executing hub collection')
+
+        # check services
+        if not self.hub_action_client.server_is_ready():
+            rospy.logwarn('hub action server is not up! Aborting action')
+            raise Exception('Hub service action is not up!')
+
+        if not self.hub_service_client.service_is_ready():
+            rospy.logwarn('hub service server is not up! Aborting action')
+            raise Exception('Hub service is not up!')
+
+        # call hub service
+        description['operation'] = HubOperation.OPERATION_COLLECT
+        request = self.get_hub_request(description)
+        self.hub_future = self.hub_service_client.call_async(request)
+
+
+        # check if order is valid
+        rospy.loginfo('Chacking order validity')
+        rclpy.spin_until_future_complete(self.ros2_node, self.hub_future)
+        result = self.hub_future.result()
+        rospy.loginfo(f'dock available: {result.available_dock},\
+                valid order: {result.is_valid}')
+        # if not result.available_dock or not result.is_valid:
+        #     rospy.logwarn('Invalid hub request, aborting hub operation')
+        #     return
+
+        # dock to april tag
+        rospy.loginfo('Calling docking action')
+        dock_goal = self.get_dock_action_goal(HubOperation.OPERATION_COLLECT)
+        if dock_goal is not None:
+            self.docking_action_client.send_goal_and_wait(dock_goal)
+        else:
+            rospy.logwarn('Aborting docking action: invalid dock goal')
+            return
+
+        # call hub action
+        rospy.loginfo('Calling hub action')
+        hub_action_goal = self.get_hub_action_goal(description)
+        self.hub_action_done = False
+        self.hub_future = self.hub_action_client.send_goal_async(hub_action_goal,
+                feedback_callback=self.hub_action_feedback_cb)
+        self.hub_future.add_done_callback(self.hub_goal_response_cb)
+        # rclpy.spin_until_future_complete(self.ros2_node, self.hub_future)
+        self.wait_hub_action()
         return
+
+    # depositing to hub
+    def hub_deposit(self, description):
+        rospy.loginfo('executing hub deposit')
+
+        # check services
+        if not self.hub_action_client.server_is_ready():
+            rospy.logwarn('hub action server is not up! Aborting action')
+            raise Exception('Hub service action is not up!')
+
+        if not self.hub_service_client.service_is_ready():
+            rospy.logwarn('hub service server is not up! Aborting action')
+            raise Exception('Hub service is not up!')
+
+        # call hub service
+        rospy.loginfo('Calling Hub service')
+        description['operation'] = HubOperation.OPERATION_DEPOSIT
+        request = self.get_hub_request(description)
+        self.hub_future = self.hub_service_client.call_async(request)
+        rclpy.spin_until_future_complete(self.ros2_node, self.hub_future)
+
+        # check if order is valid
+        rospy.loginfo('Checking order validity')
+        result = self.hub_future.result()
+        rospy.loginfo(f'dock available: {result.available_dock},\
+                valid order: {result.is_valid}')
+        # if not result.available_dock or not result.is_valid:
+        #     rospy.logwarn('Invalid hub request, aborting hub operation')
+        #     return
+
+        # dock to april tag
+        rospy.loginfo('Calling docking action')
+        dock_goal = self.get_dock_action_goal(HubOperation.OPERATION_DEPOSIT)
+        if dock_goal is not None:
+            self.docking_action_client.send_goal(dock_goal)
+            rospy.loginfo("sent goal and now waiting for result")
+            self.docking_action_client.wait_for_result()
+            dock_result = self.docking_action_client.get_result()
+            rospy.loginfo(f"dock result {dock_result}")
+        else:
+            rospy.logwarn('Aborting docking action: invalid dock goal')
+            return
+
+        # call hub action
+        rospy.loginfo('Calling hub action')
+        hub_action_goal = self.get_hub_action_goal(description)
+        # self.hub_action_result = self.hub_action_client.send_goal(hub_action_goal)
+        self.hub_action_done = False
+        self.hub_future = self.hub_action_client.send_goal_async(hub_action_goal,
+                feedback_callback=self.hub_action_feedback_cb)
+        self.hub_future.add_done_callback(self.hub_goal_response_cb)
+        # rclpy.spin_until_future_complete(self.ros2_node, self.hub_future)
+        self.wait_hub_action()
+
+        # call slider
+        rospy.loginfo('Calling slider action')
+        payload_action_goal = self.get_payload_action_goal(PayLoadMode.PUSHER_OUT)
+        self.payload_action_client.send_goal(payload_action_goal)
+        self.payload_action_client.wait_for_result()
+        self.payload_action_client.get_result()
+        time.sleep(3)
+        payload_action_goal = self.get_payload_action_goal(PayLoadMode.PUSHER_IN)
+        self.payload_action_client.send_goal(payload_action_goal)
+        self.payload_action_client.wait_for_result()
+        self.payload_action_client.get_result()
+
+        # call hub action
+        rospy.loginfo('Calling hub action')
+        # self.hub_action_result = self.hub_action_client.send_goal(hub_action_goal)
+        self.hub_action_done = False
+        self.hub_future = self.hub_action_client.send_goal_async(hub_action_goal,
+                feedback_callback=self.hub_action_feedback_cb)
+        self.hub_future.add_done_callback(self.hub_goal_response_cb)
+        # rclpy.spin_until_future_complete(self.ros2_node, self.hub_future)
+        self.wait_hub_action()
+
+
+
+        rospy.loginfo('hub action complete')
+        return
+
+    def hub_goal_response_cb(self, future):
+        goal_handle= future.result()
+        if not goal_handle.accepted:
+            rospy.loginfo('hub action goal rejected')
+            return
+        rospy.loginfo('hub action goal accepted')
+
+        self.__get_hub_result_future = goal_handle.get_result_async()
+        self.__get_hub_result_future.add_done_callback(self.hub_action_result_cb)
+
+    def hub_action_feedback_cb(self, feedback_msg):
+        feedback = feedback_msg.msg
+        rospy.loginfo(f'hub action feedback: {feedback}')
+
+    def hub_action_result_cb(self, future):
+        result = future.result().result
+        rospy.loginfo(f"got hub action result {result}")
+        self.hub_action_done = True
+
+    def wait_hub_action(self):
+        while not self.hub_action_done:
+            rospy.loginfo('waiting for hub action')
+            rclpy.spin_once(self.ros2_node)
+
+    def get_hub_request(self, description) -> HubService.Request:
+        request = HubService.Request()
+        request.operation.operation = description['operation']
+        request.company_name = description['company_name']
+        request.order_id = description['id']
+        return request
+
+    def get_hub_action_goal(self, description) -> HubAction.Goal:
+        goal = HubAction.Goal()
+        goal.company_name = description['company_name']
+        goal.order_id = description['id']
+        goal.operation.operation = description['operation']
+        return goal
+
+
+    def get_dock_action_goal(self, operation) -> VisionServoActionGoal:
+        goal = None
+        if operation == HubOperation.OPERATION_DEPOSIT:
+            goal = VisionServoActionGoal(tag_id=self.config.deposit_tag_id)
+        elif operation == HubOperation.OPERATION_COLLECT:
+            goal = VisionServoActionGoal(tag_id=self.config.collect_tag_id)
+        else:
+            rospy.loginfo('Hub operation not valid for docking')
+            return None
+
+        if goal == None:
+            raise Exception("unable to create docking goal")
+        return goal
+
+    def get_payload_action_goal(self, operation) -> PayLoadActionGoal:
+        goal = PayLoadActionGoal()
+        goal.pusher_action.operation = operation
+        return goal
+
+    def send_hub_request(self, request):
+        self.hub_service_client.call(request)
+
 
     def eject_robot(self,description):
         rospy.loginfo("ejecting robot")

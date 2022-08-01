@@ -14,6 +14,8 @@ class ClientNodeConfig():
         self.max_dist_to_first_waypoint = 10.0
         self.map_directory = os.path.join(os.path.expanduser('~'), 'tmp')
         self.actions = ['eject_robot', 'hub_collect', 'hub_deposit']
+        self.collect_tag_id = 1
+        self.deposit_tag_id = 2
 
     def print_config(self):
         print(f'Fleet Name: {self.fleet_name}')
