@@ -3,6 +3,8 @@
 ## About
 `restful fleet` is a fleet manager package for [`RMF`](https://github.com/open-rmf/rmf). The implementation of this package is largely based on [`free fleet`](https://github.com/open-rmf/free_fleet). `free fleet` uses DDS as its middleware to communicate between the server and client. However, it can be cumbersome to allow DDS packets to be transferred across the Wide Area Network. Threfore the middleware implementation of `restful fleet` is using restful http requests.
 
+![restful fleet description](./media/restful_fleet_manager_diagram.png)
+
 ## Installation
 ```
 cd <ws_path>/src
