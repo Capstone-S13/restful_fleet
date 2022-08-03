@@ -40,6 +40,34 @@ The `ServerNode` contains the ROS publishers, subscribers to publish and subscri
 ### ServerNode and ClientNode
 Likewise, the `ServerNode` contains ROS specific classes and callback functions. The `ClientNode` contains the publishers, subscribers, action client, action servers required determin the robot's state as well as to command the robot to carry out necessary tasks.
 
+### Support for Perform Action
+The `restful fleet` has support for perform action. However this requires fleet adapter's `ActionExecutor` to be implemented in a specific manner. The fleet adapter is required to publish a json messsage containing the information mentioned below, in the form of `std_msgs/String`, to the `<robot name>/perform_action` topic.
+
+The json message should have the following attributes:
+* description
+* category
+* robot
+
+1. `description`
+    The data necessary for the execution of the action should be contained in the `description` attribute of the [perform action schema](https://raw.githubusercontent.com/open-rmf/rmf_ros2/main/rmf_fleet_adapter/schemas/event_description__perform_action.json). The `restful_fleet_server`.
+
+2. `category`
+    The value of the category attribute would be the string name of the action that is to be performed.
+
+3. `robot`
+    The value of this attribute is the string name of the robot to perform the action.
+
+The `restful_fleet_server` would be subscribing to the `<robot name>/perform_action` topic. The information would be relayed to `restful_fleet_client`. The `restful_fleet_client` would then extract the information from the json message's `description` and `category` attribute to carry out the action.
+The default implementation uses the `getattr` method in python.
+i.e
+```python
+category = json_msg['category']
+action = getattr(ClientNode, category)
+action()
+```
+Therefore the method in for the action should be named according to the `category` of the action.
+
+
 
 ## Future Improvements
 * Multi client discovery.
